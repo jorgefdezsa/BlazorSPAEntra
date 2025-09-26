@@ -1,0 +1,83 @@
+﻿@inject IAccessTokenProvider TokenProvider
+
+@page "/"
+
+
+<PageTitle>Home</PageTitle>
+
+<h1>Hello, world!</h1>
+
+Welcome to your new app.
+
+
+<h3>Access Token</h3>
+
+<button class="btn btn-primary" @onclick="MostrarToken">Obtener token</button>
+<button class="btn btn-primary" @onclick="CallFunction">Llamar Function</button>
+
+@if (!string.IsNullOrEmpty(Token))
+{
+    <pre>@Token</pre>
+}
+else if (Error != null)
+{
+    <p class="text-danger">@Error</p>
+}
+
+@code {
+    private string? Token;
+    private string? Error;
+
+    private async Task MostrarToken()
+    {
+        var result = await TokenProvider.RequestAccessToken();
+
+        if (result.TryGetToken(out var token))
+        {
+            Token = token.Value;
+            Error = null;
+        }
+        else
+        {
+            Token = null;
+            Error = "No se pudo obtener el token.";
+        }
+    }
+
+    private async Task CallFunction()
+    {
+        var result = await TokenProvider.RequestAccessToken();
+
+        try
+        {
+
+            if (result.TryGetToken(out var token))
+            {
+                Token = token.Value;
+                Error = null;
+                // Llamar a la Azure Function con el token
+                using var httpClient = new HttpClient();
+                httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token.Value);
+                var response = await httpClient.GetAsync("https://blazorsecuritydemo-eahfhabjaydweudh.westeurope-01.azurewebsites.net/api/SecureFunction");
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+                    Token += $"\n\nResponse from Function: {content}";
+                }
+                else
+                {
+                    Token += $"\n\nFailed to call Function: {response.ReasonPhrase}";
+                }
+            }
+            else
+            {
+                Token = null;
+                Error = "No se pudo obtener el token.";
+            }
+        }catch(Exception ex)
+        {
+            Token = null;
+            Error = $"Error calling Function: {ex.Message}";
+        }
+    }
+}
